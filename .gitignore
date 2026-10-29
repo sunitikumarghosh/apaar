@@ -1,0 +1,3 @@
+# Raw downloads kept in the root; published copies live in data/
+/*.xlsx
+/*.csv

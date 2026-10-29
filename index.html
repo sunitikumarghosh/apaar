@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#1a237e">
+    <title>APAAR Creation Monitor</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a237e'/%3E%3Cpath d='M8 22V12M14 22V8M20 22v-6M26 22V14' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+    <button id="menuBtn" class="icon-btn" aria-label="Open menu">&#9776;</button>
+    <div class="brand">
+        <span class="brand-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 23V13M14 23V9M20 23v-6M26 23V15" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" fill="none"/></svg></span>
+        <span class="brand-text">
+            <strong>APAAR Creation status <em>:: SSM, Purba Bardhaman</em></strong>
+            <span class="tagline">An in-house production of SSM, Purba Bardhaman</span>
+        </span>
+    </div>
+    <div class="date-pick">
+        <label>Data of <select id="curDate"></select></label>
+        <label>Compare with <select id="prevDate"></select></label>
+    </div>
+</header>
+
+<div class="layout">
+    <aside id="sidebar">
+        <nav>
+            <div class="nav-group">Overview</div>
+            <a href="#/dashboard" data-route="dashboard">&#128202; Dashboard</a>
+            <a href="#/blocks" data-route="blocks">&#127970; Block-wise Status</a>
+            <a href="#/rank" data-route="rank">&#127942; Leading &amp; Lagging</a>
+            <a href="#/groups?by=mg" data-route="groups">&#127891; Management / Category</a>
+            <div class="nav-group">Schools</div>
+            <a href="#/schools" data-route="schools">&#128203; All Schools</a>
+            <a href="#/schools/full" data-route="schools/full"><i class="dot full"></i> 100% Generated</a>
+            <a href="#/schools/part" data-route="schools/part"><i class="dot part"></i> 1&ndash;99% Generated</a>
+            <a href="#/schools/zero" data-route="schools/zero"><i class="dot zero"></i> 0% Generated</a>
+            <a href="#/schools/failed" data-route="schools/failed"><i class="dot zero"></i> Failed Requests</a>
+            <a href="#/schools/requested" data-route="schools/requested"><i class="dot info"></i> Requests in Process</a>
+            <div class="nav-group">Progress</div>
+            <a href="#/compare" data-route="compare">&#8644; Day-wise Comparison</a>
+            <a href="#/trend" data-route="trend">&#128200; Daily Trend</a>
+            <div class="nav-group">Data</div>
+            <a href="#/data" data-route="data">&#11014; Upload / Manage Data</a>
+        </nav>
+        <div class="side-foot">
+            <span class="side-credit">An in-house production of<br><b>SSM, Purba Bardhaman</b></span>
+            <span>Source: UDISE+ portal &mdash; APAAR Entry Status, School Wise (Only Operational)</span>
+        </div>
+    </aside>
+    <div id="backdrop"></div>
+    <main>
+        <div id="view"><div class="loading">Loading&hellip;</div></div>
+        <footer class="app-foot">
+            <span>&copy; <span id="year"></span> SSM, Purba Bardhaman &middot; APAAR Creation status</span>
+            <span>An in-house production of SSM, Purba Bardhaman</span>
+        </footer>
+    </main>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
