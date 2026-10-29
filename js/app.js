@@ -451,15 +451,20 @@ function makeTable({ cols, rows, sort = null, dir = 'desc', pageSize = 0, onRow 
 }
 
 // ---------------------------------------------------------------- export (Excel / PDF)
+// The four title rows and the blank row above every Excel report
+const excelHead = (title, sub) => [
+    [HEADER],
+    [title],
+    [`Data as on: ${fmtD(state.cur)}${sub ? '  |  ' + sub : ''}`],
+    [`Generated on: ${new Date().toLocaleString('en-IN')}  |  ${CREDIT}`],
+    [],
+];
+
 function exportExcel(spec) {
     const { title, cols, rows, foot, sub } = spec();
     const n = cols.length;
     const aoa = [
-        [HEADER],
-        [title],
-        [`Data as on: ${fmtD(state.cur)}${sub ? '  |  ' + sub : ''}`],
-        [`Generated on: ${new Date().toLocaleString('en-IN')}  |  ${CREDIT}`],
-        [],
+        ...excelHead(title, sub),
         cols.map(c => c.h),
         ...rows.map((r, i) => cols.map(c => cellOut(c, r, i, false))),
     ];
@@ -481,7 +486,6 @@ function exportPDF(spec) {
     const { title, cols, rows, foot, sub } = spec();
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: cols.length > 6 ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
-    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
     const TP = '{total_pages}';
     const generated = new Date().toLocaleString('en-IN');
     const colStyles = {};
@@ -494,37 +498,46 @@ function exportPDF(spec) {
         showFoot: 'lastPage',
         startY: 34,
         margin: { top: 34, left: 8, right: 8, bottom: 14 },
-        styles: { fontSize: cols.length > 10 ? 7 : 8, cellPadding: 1.6, overflow: 'linebreak', lineColor: [220, 222, 235], lineWidth: 0.1 },
-        headStyles: { fillColor: [26, 35, 126], textColor: 255, fontStyle: 'bold' },
-        footStyles: { fillColor: [232, 234, 246], textColor: 20, fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [246, 247, 252] },
+        ...PDF_STYLE,
+        styles: { ...PDF_STYLE.styles, fontSize: cols.length > 10 ? 7 : 8 },
         columnStyles: colStyles,
         didParseCell: d => {
             if (d.section !== 'body' && NUM_TYPES.has(cols[d.column.index].type)) d.cell.styles.halign = 'right';
         },
-        didDrawPage: () => {
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(13);
-            doc.setTextColor(26, 35, 126);
-            doc.text(HEADER, W / 2, 11, { align: 'center' });
-            doc.setFontSize(11);
-            doc.setTextColor(30);
-            doc.text(title, W / 2, 18, { align: 'center' });
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(8.5);
-            doc.text(`Data as on: ${fmtD(state.cur)}${sub ? '   |   ' + sub : ''}`, W / 2, 24, { align: 'center' });
-            doc.setDrawColor(26, 35, 126);
-            doc.setLineWidth(0.5);
-            doc.line(8, 28, W - 8, 28);
-            doc.setFontSize(7.5);
-            doc.setTextColor(110);
-            doc.text(`Generated on ${generated}`, 8, H - 6);
-            doc.text(CREDIT, W / 2, H - 6, { align: 'center' });
-            doc.text(`Page ${doc.internal.getNumberOfPages()} of ${TP}`, W - 8, H - 6, { align: 'right' });
-        },
+        didDrawPage: () => pdfFrame(doc, title, sub, generated, TP),
     });
     if (typeof doc.putTotalPages === 'function') doc.putTotalPages(TP);
     doc.save(`${slug(title)}_${state.cur}.pdf`);
+}
+
+const PDF_STYLE = {
+    styles: { fontSize: 8, cellPadding: 1.6, overflow: 'linebreak', lineColor: [226, 232, 240], lineWidth: 0.1, textColor: [30, 41, 59] },
+    headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: 'bold' },
+    footStyles: { fillColor: [224, 233, 255], textColor: [15, 23, 42], fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+};
+
+// Header (portal name, report title, data date) and footer drawn on every PDF page
+function pdfFrame(doc, title, sub, generated, TP) {
+    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(30, 58, 138);
+    doc.text(HEADER, W / 2, 11, { align: 'center' });
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text(title, W / 2, 18, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.text(`Data as on: ${fmtD(state.cur)}${sub ? '   |   ' + sub : ''}`, W / 2, 24, { align: 'center' });
+    doc.setDrawColor(30, 58, 138);
+    doc.setLineWidth(0.5);
+    doc.line(8, 28, W - 8, 28);
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Generated on ${generated}`, 8, H - 6);
+    doc.text(CREDIT, W / 2, H - 6, { align: 'center' });
+    doc.text(`Page ${doc.internal.getNumberOfPages()} of ${TP}`, W - 8, H - 6, { align: 'right' });
 }
 
 function exportBtns(spec) {
@@ -582,7 +595,7 @@ function chart(parent, height, config) {
     config.options = Object.assign({ responsive: true, maintainAspectRatio: false, animation: { duration: 300 } }, config.options);
     state.charts.push(new Chart($('canvas', box), config));
 }
-const COLORS = { good: '#2e7d32', mid: '#e08600', bad: '#c62828', na: '#9e9e9e', brand: '#1a237e', brand2: '#3949ab' };
+const COLORS = { good: '#16a34a', mid: '#f59e0b', bad: '#dc2626', na: '#94a3b8', brand: '#1e3a8a', brand2: '#2563eb' };
 
 const ICONS = {
     student: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
@@ -1076,6 +1089,239 @@ function groupSummary(v, S, P) {
     });
 }
 
+// ---------------------------------------------------------------- Block x Management report (fits two slides)
+// Dept. of Education, SSK & MSK and Govt. Sponsored schools side by side, every other management together
+const MG4 = [
+    { k: 'doe', h: 'Dept. of Education', names: ['Department of Education'], tone: '#2563eb' },
+    { k: 'ssk', h: 'SSK & MSK', names: ['SSKs & MSKs'], tone: '#7c3aed' },
+    { k: 'gs', h: 'Govt. Sponsored', names: ['Govt. Sponsored'], tone: '#0891b2' },
+    { k: 'oth', h: 'Other Managements', names: null, tone: '#d97706' },
+    { k: 'all', h: 'All Managements', names: null, tone: '#0b1f44' },
+];
+const MG_SUB = [['schools', 'Schools'], ['t', 'Enrolment'], ['o', 'APAAR'], ['pend', 'Pending'], ['p', '%']];
+const MG_SHORT = ['Sch.', 'Enrol.', 'APAAR', 'Pending', '%']; // headings for the narrow PDF / slide columns
+const MG_TITLE = 'APAAR Creation Status - Block & Management-wise';
+const mg4Of = x => { const n = groupOf(x, 'mg'); const g = MG4.find(m => m.names && m.names.includes(n)); return g ? g.k : 'oth'; };
+
+function mgReport(S) {
+    return memo(`mg4|${S.date}`, () => {
+        const mk = name => Object.fromEntries(MG4.map(g => [g.k, blank(name)]));
+        const rows = S.blocks.map(b => ({ block: b.block, g: mk(b.block) }));
+        const byB = new Map(rows.map(r => [r.block, r]));
+        const tot = { block: 'District Total', g: mk('District Total') };
+        const others = new Map();
+        S.schools.forEach(x => {
+            const k = mg4Of(x);
+            [byB.get(x.b), tot].forEach(r => { addTo(r.g[k], x); addTo(r.g.all, x); });
+            if (k === 'oth') { const n = groupOf(x, 'mg'); others.set(n, (others.get(n) || 0) + 1); }
+        });
+        [...rows, tot].forEach(r => Object.values(r.g).forEach(finish));
+        return { rows, tot, others: [...others].sort((a, b) => b[1] - a[1]) };
+    });
+}
+
+// One cell: { text, cls } where cls marks a % above (hi) / below (lo) the district % of the same management
+function mgCell(R, r, gk, sk, total) {
+    const a = r.g[gk];
+    if (!a.schools) return { text: '-', cls: '' };
+    if (sk !== 'p') return { text: fmtN(a[sk]), cls: '' };
+    const d = R.tot.g[gk].p;
+    return { text: fmtP(a.p), cls: total || !a.t ? '' : a.p >= d ? 'hi' : 'lo' };
+}
+const othersNote = R => R.others.map(([n, c]) => `${n} (${fmtN(c)})`).join(', ');
+
+function pageMgmt(v) {
+    const S = cur(), R = mgReport(S);
+    const btns = h('<div class="actions"><button class="btn xls">Excel</button><button class="btn pdf">PDF</button><button class="btn ppt">PowerPoint (2 slides)</button></div>');
+    const run = fn => async e => {
+        const b = e.currentTarget;
+        b.disabled = true;
+        try { await fn(R); } catch (err) { console.error(err); toast('Export failed: ' + err.message, true); }
+        b.disabled = false;
+    };
+    btns.children[0].onclick = run(mgExcel);
+    btns.children[1].onclick = run(mgPDF);
+    btns.children[2].onclick = run(mgPPT);
+    pageHead(v, 'Block & Management-wise Report', `Data as on <b>${fmtD(S.date)}</b> &middot; schools, enrolment, APAAR created, pending and % for each management`, btns);
+
+    // district tiles, one per management group
+    v.append(h(`<div class="mg-tiles">${MG4.map(g => {
+        const a = R.tot.g[g.k];
+        return `<div class="mg-tile ${g.k}" style="--tone:${g.tone}">
+            <h3>${esc(g.h)}</h3>
+            <div class="mg-pct">${fmtP(a.p)}% <small>created</small></div>
+            <div class="cat-bar"><span style="width:${Math.min(100, a.p)}%"></span></div>
+            <dl><dt>Schools</dt><dd>${fmtN(a.schools)}</dd><dt>Enrolment</dt><dd>${fmtN(a.t)}</dd><dt>APAAR created</dt><dd>${fmtN(a.o)}</dd><dt>Pending</dt><dd>${fmtN(a.pend)}</dd>
+            <dt>Share of pending</dt><dd>${fmtP(pct(a.pend, R.tot.g.all.pend))}%</dd></dl>
+        </div>`;
+    }).join('')}</div>`));
+    v.append(h(`<p class="help mg-note"><b>Other Managements:</b> ${esc(othersNote(R)) || 'none'}.</p>`));
+
+    const head1 = `<tr><th rowspan="2" class="sticky">#</th><th rowspan="2" class="sticky2">Block</th>${MG4.map(g => `<th colspan="${MG_SUB.length}" class="g ${g.k === 'all' ? 'all' : ''}">${esc(g.h)}</th>`).join('')}</tr>`;
+    const head2 = `<tr>${MG4.map(g => MG_SUB.map(([, t], i) => `<th class="num${i === 0 ? ' gs' : ''}${g.k === 'all' ? ' all' : ''}">${t}</th>`).join('')).join('')}</tr>`;
+    const line = (r, i, total) => `<td class="sticky num">${total ? '' : i + 1}</td><td class="sticky2 nowrap">${esc(r.block)}</td>` + MG4.map(g => MG_SUB.map(([sk], j) => {
+        const c = mgCell(R, r, g.k, sk, total);
+        return `<td class="num${j === 0 ? ' gs' : ''}${g.k === 'all' ? ' all' : ''}${sk === 'p' ? ' pc ' + c.cls : ''}">${c.text}</td>`;
+    }).join('')).join('');
+    const body = card(v, `Block-wise by Management (${R.rows.length} blocks)`, null, true);
+    body.append(h(`<div class="table-wrap"><table class="mg-table"><thead>${head1}${head2}</thead>
+        <tbody>${R.rows.map((r, i) => `<tr class="clickable" data-b="${esc(r.block)}">${line(r, i)}</tr>`).join('')}</tbody>
+        <tfoot><tr>${line(R.tot, 0, true)}</tr></tfoot></table></div>`));
+    body.onclick = e => { const tr = e.target.closest('tr[data-b]'); if (tr) location.hash = '#/schools?block=' + encodeURIComponent(tr.dataset.b); };
+    v.append(h(`<p class="help"><span class="legend"><i style="background:var(--good)"></i>% at or above the district % of the same management</span>
+        <span class="legend"><i style="background:var(--bad)"></i>below it</span> &middot; Pending = Enrolment &minus; APAAR created &middot; tap a block to see its schools.</p>`));
+}
+
+// Flat rows for Excel / PDF: Sl, Block, then Schools .. % for each management group
+const mgFlat = (R, r, i, total, pdf) => [total ? '' : i + 1, r.block, ...MG4.flatMap(g => MG_SUB.map(([sk]) => {
+    const a = r.g[g.k];
+    if (!a.schools) return pdf ? '-' : '';
+    return sk === 'p' ? (pdf ? fmtP(a.p) : round2(a.p)) : pdf ? fmtN(a[sk]) : a[sk];
+}))];
+
+function mgExcel(R) {
+    const n = 2 + MG4.length * MG_SUB.length;
+    const aoa = [
+        ...excelHead(MG_TITLE, 'Pending = Enrolment - APAAR created'),
+        ['Sl', 'Block', ...MG4.flatMap(g => [g.h, ...Array(MG_SUB.length - 1).fill('')])],
+        ['', '', ...MG4.flatMap(() => MG_SUB.map(s => s[1]))],
+        ...R.rows.map((r, i) => mgFlat(R, r, i)),
+        mgFlat(R, R.tot, 0, true),
+        [],
+        [`Other Managements: ${othersNote(R)}`],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!merges'] = [
+        ...[0, 1, 2, 3].map(r => ({ s: { r, c: 0 }, e: { r, c: n - 1 } })),
+        { s: { r: 5, c: 0 }, e: { r: 6, c: 0 } }, { s: { r: 5, c: 1 }, e: { r: 6, c: 1 } },
+        ...MG4.map((g, i) => ({ s: { r: 5, c: 2 + i * MG_SUB.length }, e: { r: 5, c: 1 + (i + 1) * MG_SUB.length } })),
+    ];
+    ws['!cols'] = [{ wch: 5 }, { wch: 22 }, ...MG4.flatMap(() => [{ wch: 8 }, { wch: 11 }, { wch: 10 }, { wch: 10 }, { wch: 7 }])];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Block x Management');
+    XLSX.writeFile(wb, `${slug(MG_TITLE)}_${state.cur}.xlsx`);
+}
+
+function mgPDF(R) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const TP = '{total_pages}', generated = new Date().toLocaleString('en-IN');
+    const pIdx = new Set(MG4.map((g, i) => 2 + i * MG_SUB.length + MG_SUB.length - 1));
+    const gOf = c => Math.floor((c - 2) / MG_SUB.length);
+    doc.autoTable({
+        head: [
+            [{ content: 'Sl', rowSpan: 2 }, { content: 'Block', rowSpan: 2 }, ...MG4.map(g => ({ content: g.h, colSpan: MG_SUB.length, styles: { halign: 'center' } }))],
+            MG4.flatMap(() => MG_SHORT),
+        ],
+        body: R.rows.map((r, i) => mgFlat(R, r, i, false, true)),
+        foot: [mgFlat(R, R.tot, 0, true, true)],
+        showFoot: 'lastPage',
+        startY: 34,
+        margin: { top: 34, left: 6, right: 6, bottom: 14 },
+        ...PDF_STYLE,
+        styles: { ...PDF_STYLE.styles, fontSize: 6.6, cellPadding: 1.1, halign: 'right', overflow: 'visible' },
+        columnStyles: {
+            0: { halign: 'center', cellWidth: 7 }, 1: { halign: 'left', cellWidth: 26 },
+            ...Object.fromEntries(MG4.flatMap((g, i) => [8.5, 11, 10.5, 11, 9.4].map((w, j) => [2 + i * MG_SUB.length + j, { cellWidth: w }]))),
+        },
+        didParseCell: d => {
+            const c = d.column.index;
+            if (d.section !== 'body' && c === 1) d.cell.styles.halign = 'left';
+            if (d.section === 'head' && c > 1) d.cell.styles.halign = d.row.index === 0 ? 'center' : 'right';
+            if (d.section === 'head' && d.row.index === 1) Object.assign(d.cell.styles, { fillColor: [224, 233, 255], textColor: [30, 58, 138] });
+            if (c < 2 || d.section !== 'body') return;
+            if (MG4[gOf(c)].k === 'all') d.cell.styles.fillColor = [238, 243, 255];
+            if (pIdx.has(c)) {
+                const r = R.rows[d.row.index], a = r.g[MG4[gOf(c)].k];
+                if (a.schools && a.t) d.cell.styles.textColor = a.p >= R.tot.g[MG4[gOf(c)].k].p ? [21, 128, 61] : [185, 28, 28];
+                d.cell.styles.fontStyle = 'bold';
+            }
+        },
+        didDrawPage: () => pdfFrame(doc, MG_TITLE, 'Pending = Enrolment - APAAR created', generated, TP),
+    });
+    doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    doc.text(doc.splitTextToSize(`Other Managements: ${othersNote(R)}.  Green / red %: at or above / below the district % of the same management.`, 280), 8, doc.lastAutoTable.finalY + 5);
+    if (typeof doc.putTotalPages === 'function') doc.putTotalPages(TP);
+    doc.save(`${slug(MG_TITLE)}_${state.cur}.pdf`);
+}
+
+const PPTX_SRC = 'https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js';
+const loadScript = src => new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = res;
+    s.onerror = () => rej(new Error('could not load the PowerPoint library; check the internet connection'));
+    document.head.append(s);
+});
+
+async function mgPPT(R) {
+    if (typeof PptxGenJS === 'undefined') await loadScript(PPTX_SRC);
+    await buildMgPPT(R).writeFile({ fileName: `${slug(MG_TITLE)}_${state.cur}.pptx` });
+}
+
+// Two 16:9 slides: the blocks split in half, the district total on the second slide
+function buildMgPPT(R) {
+    const pptx = new PptxGenJS();
+    pptx.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 in
+    Object.assign(pptx, { author: 'SSM, Purba Bardhaman', company: 'SSM, Purba Bardhaman', title: MG_TITLE });
+    const F = 'Calibri', NAVY = '0B1F44', BLUE = '1E3A8A', LINE = 'D5DCE8';
+    const T = R.tot.g.all;
+    const half = Math.ceil(R.rows.length / 2);
+    const parts = [R.rows.slice(0, half), R.rows.slice(half)];
+    const border = { type: 'solid', pt: 0.5, color: LINE };
+    const colW = [0.3, 1.3, ...MG4.flatMap(() => [0.36, 0.5, 0.49, 0.5, 0.392])];
+    const hdr = (text, o = {}) => ({ text, options: { bold: true, color: 'FFFFFF', fill: { color: BLUE }, align: 'center', ...o } });
+    const sub = text => ({ text, options: { bold: true, color: BLUE, fill: { color: 'E0E9FF' }, align: 'center', fontSize: 7 } });
+    const generated = new Date().toLocaleString('en-IN');
+
+    parts.forEach((rows, pi) => {
+        const s = pptx.addSlide();
+        s.background = { color: 'FFFFFF' };
+        s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.333, h: 0.62, fill: { color: NAVY }, line: { color: NAVY } });
+        s.addText(MG_TITLE, { x: 0.25, y: 0.08, w: 9, h: 0.46, fontFace: F, fontSize: 18, bold: true, color: 'FFFFFF', margin: 0 });
+        s.addText(`Purba Bardhaman  |  Data as on ${fmtD(state.cur)}  |  Part ${pi + 1} of ${parts.length}`, { x: 8.3, y: 0.08, w: 4.78, h: 0.46, fontFace: F, fontSize: 11, color: 'BFDBFE', align: 'right', margin: 0 });
+        s.addText([
+            { text: 'District: ', options: { bold: true, color: BLUE } },
+            { text: `${fmtN(T.schools)} schools  |  Enrolment ${fmtN(T.t)}  |  APAAR created ${fmtN(T.o)}  |  Pending ${fmtN(T.pend)}  |  ` },
+            { text: `${fmtP(T.p)}% created`, options: { bold: true, color: BLUE } },
+            { text: '   (' + MG4.filter(g => g.k !== 'all').map(g => `${g.h} ${fmtP(R.tot.g[g.k].p)}%`).join(', ') + ')', options: { color: '64748B' } },
+        ], { x: 0.25, y: 0.68, w: 12.83, h: 0.3, fontFace: F, fontSize: 10, color: '334155', margin: 0 });
+
+        const body = rows.map((r, i) => {
+            const n = pi * half + i;
+            const fill = { color: n % 2 ? 'F8FAFC' : 'FFFFFF' };
+            return [
+                { text: String(n + 1), options: { align: 'center', fill } },
+                { text: r.block, options: { align: 'left', fill } },
+                ...MG4.flatMap(g => MG_SUB.map(([sk]) => {
+                    const c = mgCell(R, r, g.k, sk);
+                    const o = { align: 'right', fill: g.k === 'all' ? { color: n % 2 ? 'E8EEFF' : 'EEF3FF' } : fill };
+                    if (sk === 'p') Object.assign(o, { bold: true, color: c.cls === 'hi' ? '15803D' : c.cls === 'lo' ? 'B91C1C' : '334155' });
+                    return { text: c.text, options: o };
+                })),
+            ];
+        });
+        if (pi === parts.length - 1) body.push([
+            { text: '', options: { fill: { color: 'DCE6FF' } } },
+            { text: 'District Total', options: { align: 'left', bold: true, fill: { color: 'DCE6FF' } } },
+            ...MG4.flatMap(g => MG_SUB.map(([sk]) => ({ text: mgCell(R, R.tot, g.k, sk, true).text, options: { align: 'right', bold: true, fill: { color: 'DCE6FF' } } }))),
+        ]);
+        s.addTable([
+            [hdr('Sl', { rowspan: 2 }), hdr('Block', { rowspan: 2, align: 'left' }), ...MG4.map(g => hdr(g.h, { colspan: MG_SUB.length }))],
+            MG4.flatMap(() => MG_SHORT.map(sub)),
+            ...body,
+        ], { x: 0.25, y: 1.04, w: 12.83, colW, rowH: 0.215, fontFace: F, fontSize: 7.5, color: '1E293B', border, valign: 'middle', margin: [0, 0.04, 0, 0.04], autoPage: false });
+
+        const notes = ['Pending = Enrolment - APAAR created.  % in green: at or above the district % of the same management; red: below.'];
+        if (pi === parts.length - 1) notes.unshift(`Other Managements: ${othersNote(R)}.`);
+        s.addText(notes.join('\n'), { x: 0.25, y: 6.62, w: 9.6, h: 0.5, fontFace: F, fontSize: 8, color: '64748B', valign: 'top', margin: 0 });
+        s.addText(`${CREDIT}\nGenerated on ${generated}`, { x: 9.9, y: 6.62, w: 3.18, h: 0.5, fontFace: F, fontSize: 8, color: '64748B', align: 'right', valign: 'top', margin: 0 });
+        s.addShape(pptx.ShapeType.rect, { x: 0, y: 7.38, w: 13.333, h: 0.12, fill: { color: BLUE }, line: { color: BLUE } });
+    });
+    return pptx;
+}
+
 // ---------------------------------------------------------------- Upload / Manage Data password
 // Static site: only the SHA-256 hash of the password is kept here; unlocking lasts for the browser tab session.
 const ADMIN_HASH = 'ab05e582c7455107115fe4a1de5320598c3e9e879d7a243b3f944bb265ea6573';
@@ -1337,7 +1583,7 @@ function fillDateSelects() {
 }
 
 // ---------------------------------------------------------------- routing
-const routes = { dashboard: pageDashboard, blocks: pageBlocks, schools: pageSchools, compare: pageCompare, trend: pageTrend, rank: pageRank, groups: pageGroups, data: pageData };
+const routes = { dashboard: pageDashboard, blocks: pageBlocks, schools: pageSchools, compare: pageCompare, trend: pageTrend, rank: pageRank, groups: pageGroups, mgmt: pageMgmt, data: pageData };
 
 function parseHash() {
     const raw = location.hash.replace(/^#\/?/, '');
@@ -1352,6 +1598,8 @@ function render() {
     const r = parseHash();
     const key = r.name + (r.arg ? '/' + r.arg : '');
     document.querySelectorAll('#sidebar nav a').forEach(a => a.classList.toggle('active', a.dataset.route === key));
+    const link = $(`#sidebar nav a[data-route="${key}"]`) || $(`#sidebar nav a[data-route="${r.name}"]`);
+    $('#crumbTitle').textContent = link ? link.textContent.trim() : 'Dashboard';
     const v = $('#view');
     v.innerHTML = '';
     document.body.classList.remove('menu-open');
@@ -1370,6 +1618,9 @@ async function init() {
         return;
     }
     $('#year').textContent = new Date().getFullYear();
+    Object.assign(Chart.defaults, { color: '#64748b', borderColor: '#eef2f7' });
+    Chart.defaults.font.family = 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+    Object.assign(Chart.defaults.plugins.tooltip, { backgroundColor: '#0f172a', padding: 10, cornerRadius: 6 });
     $('#menuBtn').onclick = () => document.body.classList.toggle('menu-open');
     $('#backdrop').onclick = () => document.body.classList.remove('menu-open');
     $('#curDate').onchange = e => { setCur(e.target.value); fillDateSelects(); render(); };
